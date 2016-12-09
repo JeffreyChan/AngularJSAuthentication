@@ -8,11 +8,17 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using System.Web;
+using AngularJSAuthentication.API.Repository;
+using Autofac;
+using Autofac.Integration.Owin;
 
 namespace AngularJSAuthentication.API.Providers
 {
     public class SimpleAuthorizationServerProvider : OAuthAuthorizationServerProvider
     {
+        public IAuthRepository AuthRepository { get; set; }
+
+
         public override Task ValidateClientAuthentication(OAuthValidateClientAuthenticationContext context)
         {
 
@@ -34,10 +40,13 @@ namespace AngularJSAuthentication.API.Providers
                 return Task.FromResult<object>(null);
             }
 
-            using (AuthRepository _repo = new AuthRepository())
+
+            if (this.AuthRepository == null)
             {
-                client = _repo.FindClient(context.ClientId);
+                this.AuthRepository = context.OwinContext.GetAutofacLifetimeScope().Resolve<IAuthRepository>();
             }
+
+            client = AuthRepository.FindClient(context.ClientId);
 
             if (client == null)
             {
@@ -84,15 +93,17 @@ namespace AngularJSAuthentication.API.Providers
 
             context.OwinContext.Response.Headers.Add("Access-Control-Allow-Origin", new[] { allowedOrigin });
 
-            using (AuthRepository _repo = new AuthRepository())
+            if (this.AuthRepository == null)
             {
-                IdentityUser user = await _repo.FindUser(context.UserName, context.Password);
+                this.AuthRepository = context.OwinContext.GetAutofacLifetimeScope().Resolve<IAuthRepository>();
+            }
 
-                if (user == null)
-                {
-                    context.SetError("invalid_grant", "The user name or password is incorrect.");
-                    return;
-                }
+            IdentityUser user = await AuthRepository.FindUser(context.UserName, context.Password);
+
+            if (user == null)
+            {
+                context.SetError("invalid_grant", "The user name or password is incorrect.");
+                return;
             }
 
             var identity = new ClaimsIdentity(context.Options.AuthenticationType);
@@ -128,7 +139,7 @@ namespace AngularJSAuthentication.API.Providers
 
             // Change auth ticket for refresh token requests
             var newIdentity = new ClaimsIdentity(context.Ticket.Identity);
-            
+
             var newClaim = newIdentity.Claims.Where(c => c.Type == "newClaim").FirstOrDefault();
             if (newClaim != null)
             {

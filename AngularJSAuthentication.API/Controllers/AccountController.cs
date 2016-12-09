@@ -21,16 +21,16 @@ namespace AngularJSAuthentication.API.Controllers
     [RoutePrefix("api/Account")]
     public class AccountController : ApiController
     {
-        private AuthRepository _repo = null;
+        private AuthRepository _authRepository;
 
         private IAuthenticationManager Authentication
         {
             get { return Request.GetOwinContext().Authentication; }
         }
 
-        public AccountController()
+        public AccountController(AuthRepository authRepository)
         {
-            _repo = new AuthRepository();
+            this._authRepository = authRepository;
         }
 
         // POST api/Account/Register
@@ -43,7 +43,7 @@ namespace AngularJSAuthentication.API.Controllers
                 return BadRequest(ModelState);
             }
 
-             IdentityResult result = await _repo.RegisterUser(userModel);
+             IdentityResult result = await this._authRepository.RegisterUser(userModel);
 
              IHttpActionResult errorResult = GetErrorResult(result);
 
@@ -94,7 +94,7 @@ namespace AngularJSAuthentication.API.Controllers
                 return new ChallengeResult(provider, this);
             }
 
-            IdentityUser user = await _repo.FindAsync(new UserLoginInfo(externalLogin.LoginProvider, externalLogin.ProviderKey));
+            IdentityUser user = await this._authRepository.FindAsync(new UserLoginInfo(externalLogin.LoginProvider, externalLogin.ProviderKey));
 
             bool hasRegistered = user != null;
 
@@ -126,7 +126,7 @@ namespace AngularJSAuthentication.API.Controllers
                 return BadRequest("Invalid Provider or External Access Token");
             }
 
-            IdentityUser user = await _repo.FindAsync(new UserLoginInfo(model.Provider, verifiedAccessToken.user_id));
+            ApplicationUser user = await this._authRepository.FindAsync(new UserLoginInfo(model.Provider, verifiedAccessToken.user_id));
 
             bool hasRegistered = user != null;
 
@@ -135,9 +135,9 @@ namespace AngularJSAuthentication.API.Controllers
                 return BadRequest("External user is already registered");
             }
 
-            user = new IdentityUser() { UserName = model.UserName };
+            user = new ApplicationUser() { UserName = model.UserName };
 
-            IdentityResult result = await _repo.CreateAsync(user);
+            IdentityResult result = await this._authRepository.CreateAsync(user);
             if (!result.Succeeded)
             {
                 return GetErrorResult(result);
@@ -149,7 +149,7 @@ namespace AngularJSAuthentication.API.Controllers
                 Login = new UserLoginInfo(model.Provider, verifiedAccessToken.user_id)
             };
 
-            result = await _repo.AddLoginAsync(user.Id, info.Login);
+            result = await this._authRepository.AddLoginAsync(user.Id, info.Login);
             if (!result.Succeeded)
             {
                 return GetErrorResult(result);
@@ -178,7 +178,7 @@ namespace AngularJSAuthentication.API.Controllers
                 return BadRequest("Invalid Provider or External Access Token");
             }
 
-            IdentityUser user = await _repo.FindAsync(new UserLoginInfo(provider, verifiedAccessToken.user_id));
+            IdentityUser user = await this._authRepository.FindAsync(new UserLoginInfo(provider, verifiedAccessToken.user_id));
 
             bool hasRegistered = user != null;
 
@@ -194,15 +194,6 @@ namespace AngularJSAuthentication.API.Controllers
 
         }
 
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                _repo.Dispose();
-            }
-
-            base.Dispose(disposing);
-        }
 
         #region Helpers
 
@@ -261,7 +252,7 @@ namespace AngularJSAuthentication.API.Controllers
                 return "client_Id is required";
             }
 
-            var client = _repo.FindClient(clientId);
+            var client = this._authRepository.FindClient(clientId);
 
             if (client == null)
             {
