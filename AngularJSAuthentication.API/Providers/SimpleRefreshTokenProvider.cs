@@ -8,6 +8,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Web;
 using AngularJSAuthentication.API.Repository;
+using Autofac;
+using Autofac.Integration.Owin;
 
 namespace AngularJSAuthentication.API.Providers
 {
@@ -44,6 +46,12 @@ namespace AngularJSAuthentication.API.Providers
 
             token.ProtectedTicket = context.SerializeTicket();
 
+            if (this.AuthRepository == null)
+            {
+                this.AuthRepository = context.OwinContext.GetAutofacLifetimeScope().Resolve<IAuthRepository>();
+            }
+
+
             var result = await AuthRepository.AddRefreshToken(token);
 
             if (result)
@@ -60,6 +68,11 @@ namespace AngularJSAuthentication.API.Providers
             context.OwinContext.Response.Headers.Add("Access-Control-Allow-Origin", new[] { allowedOrigin });
 
             string hashedTokenId = Helper.GetHash(context.Token);
+
+            if (this.AuthRepository == null)
+            {
+                this.AuthRepository = context.OwinContext.GetAutofacLifetimeScope().Resolve<IAuthRepository>();
+            }
 
             var refreshToken = await AuthRepository.FindRefreshToken(hashedTokenId);
 
